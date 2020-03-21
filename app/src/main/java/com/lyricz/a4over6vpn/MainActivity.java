@@ -4,6 +4,8 @@ import android.Manifest;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.os.Environment;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 import androidx.appcompat.app.AppCompatActivity;
 import android.os.Bundle;
@@ -16,6 +18,8 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Timer;
+import java.util.TimerTask;
 
 // A pipe implement only for reading
 class Pipe {
@@ -66,41 +70,71 @@ public class MainActivity extends AppCompatActivity {
         System.loadLibrary("native-lib");
     }
 
+    // UI handler
+    private static Handler ui = new Handler(Looper.getMainLooper());
+
+    // Parameters
+    static int TIMER_INTERVAL = 1000;
+    static String TAG = "MainActivity";
+
+    // UI components
+    private TextView statisticsView;
+
+    // Variables
+    private boolean running;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        checkPermissions();
+        running = false;
+
+        // Link cache directory
         Pipe.directory = getApplicationContext().getCacheDir();
+
+        // Link UI components
+        linkUI();
+
+        // For data statistics
+        startStatisticsTimer();
     }
 
-    private void checkPermissions() {
-        String[] permissions = new String[] {
-            Manifest.permission.INTERNET,
-            Manifest.permission.READ_EXTERNAL_STORAGE,
-            Manifest.permission.WRITE_EXTERNAL_STORAGE,
-            Manifest.permission.BIND_VPN_SERVICE
+    protected void linkUI() {
+        statisticsView = findViewById(R.id.statistics);
+    }
+
+    protected void startStatisticsTimer() {
+        Timer timer = new Timer();
+        TimerTask task = new TimerTask() {
+            @Override
+            public void run() {
+                if (!running) {
+                    cancel();
+                }
+                String info = getBackendStatistics();
+
+                // Update UI
+                Runnable update = new Runnable() {
+                    @Override
+                    public void run() {
+                        statisticsView.setText(info);
+                    }
+                };
+                ui.post(update);
+            }
         };
 
-        List<String> needed = new ArrayList<>();
-
-        for (String permission: permissions) {
-            int granted = ContextCompat.checkSelfPermission(this, permission);
-            if (granted != PackageManager.PERMISSION_GRANTED) {
-                needed.add(permission);
-            }
-        }
-
-        if (!needed.isEmpty()) {
-            ActivityCompat.requestPermissions(this, needed.toArray(new String[0]), 0);
-        }
+        timer.schedule(task, 0, TIMER_INTERVAL);
     }
 
     /**
      * A native method that is implemented by the 'native-lib' native library,
      * which is packaged with this application.
      */
+    public native String getBackendStatistics();
+
     public native void createBackendTunnel();
+
     public native void terminateBackendTunnel();
 }

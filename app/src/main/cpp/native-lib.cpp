@@ -5,6 +5,8 @@
 # include <jni.h>
 
 // Native C++
+# include <cstdio>
+# include <cstring>
 # include <string>
 
 // Networks
@@ -18,7 +20,8 @@ typedef unsigned char u8;
 typedef unsigned int u32;
 
 // Parameters
-# define DATA_MAX_LENGTH 4096
+# define DATA_MAX_LENGTH      4096
+# define PRINT_BUFFER_LENGTH  128
 
 # define IP_REQUEST   100
 # define IP_REPLY     101
@@ -26,14 +29,18 @@ typedef unsigned int u32;
 # define NET_REPLY    103
 # define HEARTBEAT    104
 
+// Message
 struct Message {
   u32 length; // includes 'length', 'type' and 'data'
   u8 type;
   u8 data[DATA_MAX_LENGTH];
 };
 
+// Variables
 const Message ip_request = {sizeof(u32) + sizeof(u8), IP_REQUEST};
 const Message heartbeat = {sizeof(u32) + sizeof(u8), HEARTBEAT};
+
+u32 time_connected, bytes_sent, bytes_recv;
 
 int send_raw(int sockfd, void* ptr, u32 length) {
   int sent = send(sockfd, ptr, length, 0);
@@ -53,6 +60,20 @@ int send_ip_request(int sockfd) {
 }
 
 // APIs
+extern "C" JNIEXPORT jstring JNICALL
+Java_com_lyricz_a4over6vpn_MainActivity_getBackendStatistics(
+        JNIEnv* env,
+        jobject /* this */) {
+  ++ time_connected;
+  char str[PRINT_BUFFER_LENGTH];
+  if (time_connected >= 60) {
+    sprintf(str, "Sent: %d bytes\nReceived: %d bytes\nTime connected: %d mins", bytes_sent, bytes_recv, time_connected / 60);
+  } else {
+    sprintf(str, "Sent: %d bytes\nReceived: %d bytes\nTime connected: %d s", bytes_sent, bytes_recv, time_connected / 60);
+  }
+  return env -> NewStringUTF(str);
+}
+
 extern "C" JNIEXPORT void JNICALL
 Java_com_lyricz_a4over6vpn_MainActivity_createBackendTunnel(
         JNIEnv* env,

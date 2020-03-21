@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">4over6 VPN</string>
+    <string name="data_statistics_bar"> Please press Connect to begin </string>
 </resources>
