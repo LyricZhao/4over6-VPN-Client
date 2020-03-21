@@ -1,117 +1,64 @@
 package com.lyricz.a4over6vpn;
 
-import android.Manifest;
 import android.annotation.SuppressLint;
+import android.app.PendingIntent;
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
-import android.content.pm.PackageManager;
+import android.content.IntentFilter;
 import android.net.VpnService;
-import android.os.Environment;
+import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
+import android.widget.TextView;
 import android.widget.Toast;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
-import android.os.Bundle;
-import android.widget.TextView;
-import androidx.core.app.ActivityCompat;
-import androidx.core.content.ContextCompat;
 
-import java.io.BufferedInputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
 
-// A pipe implement only for reading
-class Pipe {
-    // Singleton
-    static int BUFFER_LENGTH = 4096;
-    static String TAG = "Java.Pipe";
-
-    static int pipe_count = 0;
-    static File directory;
-
-    // Object Oriented
-    private File file;
-    private byte[] buffer;
-
-    Pipe() {
-        pipe_count += 1;
-        int id = pipe_count;
-        file = new File(directory, "pipe_" + String.valueOf(id));
-        buffer = new byte[BUFFER_LENGTH];
-    }
-
-    public String path() {
-        return file.getAbsolutePath();
-    }
-
-    public void clean() {
-        if (file.exists()) {
-            file.delete();
-        }
-    }
-
-    public String read() {
-        int length = 0;
-        try {
-            FileInputStream stream = new FileInputStream(file);
-            length = (new BufferedInputStream(stream)).read(buffer);
-        } catch (Exception exception) {
-            Log.e(TAG, "Error while reading pipe " + file.getName());
-        }
-        return length > 0 ? new String(buffer) : "";
-    }
-}
-
+// MainActivity is just used for updating UI
 public class MainActivity extends AppCompatActivity {
-
-    // Used to load the 'native-lib' library on application startup.
-    static {
-        System.loadLibrary("native-lib");
-    }
 
     // UI handler
     private static Handler ui = new Handler(Looper.getMainLooper());
 
-    // Parameters
-    static int NO_DELAY = 0;
-    static int TIMER_INTERVAL = 1000;
-    static int VPN_INTENT_REQUEST = 0;
-    static String TAG = "MainActivity";
-
     // UI components
     private TextView statisticsView;
+    public static String UI_FILTER = "UI_CHANGE";
+    public static String UI_STATUS = "UI_STATUS";
 
-    // Variables
-    int sockfd;
+    // Parameters
+    static int VPN_INTENT_REQUEST = 0;
+    static String TAG = "MainActivity";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        sockfd = -1;
-
-        // Link cache directory
-        Pipe.directory = getApplicationContext().getCacheDir();
-
         // Link UI components
         statisticsView = findViewById(R.id.statistics);
 
+        // UI broadcast receiver
+        BroadcastReceiver receiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                statisticsView.setText(intent.getStringExtra(UI_STATUS));
+            }
+        };
+        IntentFilter filter = new IntentFilter();
+        filter.addAction(UI_FILTER);
+        registerReceiver(receiver, filter);
+
         // For debug
-//        connect();
+        startVPNService();
     }
 
     // Press button and connect
-    @SuppressLint("Assert")
-    protected void connect() {
-        assert(sockfd == -1);
-
+    protected void startVPNService() {
         Intent intent = VpnService.prepare(MainActivity.this);
         startActivityForResult(intent, VPN_INTENT_REQUEST);
     }
@@ -119,65 +66,24 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
         if (requestCode == VPN_INTENT_REQUEST) {
-            sockfd = requestSocket();
-            String settings = requestAddress();
-            if (settings.isEmpty()) {
-                Toast.makeText(this, "Failed to connect", Toast.LENGTH_SHORT).show();
-                return;
-            }
-
             Intent intent = new Intent(this, VPNService.class);
-
-            intent.putExtra("sockfd", sockfd);
-            intent.putExtra("info", settings);
+            Log.i(TAG, "System VPN service begins running");
+            startService(intent);
         } else {
             super.onActivityResult(requestCode, resultCode, data);
         }
     }
 
-    // Terminate tunnel
-    protected void terminate() {
-        // Terminate backend
-        terminateTunnel();
+    // Terminate service
+    protected void stopVPNService() {
+        Intent intent = new Intent(this, VPNService.class);
+        stopService(intent);
+        statisticsView.setText(R.string.data_statistics_bar);
     }
 
-    // Timer
-    protected void startTimer() {
-        Timer timer = new Timer();
-        TimerTask task = new TimerTask() {
-            @Override
-            public void run() {
-                String info = tik();
-                sockfd = info.isEmpty() ? -1 : sockfd;
-
-                if (sockfd == -1) {
-                    cancel();
-                    terminateTunnel();
-                } else {
-                    // Update UI
-                    Runnable update = new Runnable() {
-                        @Override
-                        public void run() {
-                            statisticsView.setText(info);
-                        }
-                    };
-                    ui.post(update);
-                }
-            }
-        };
-
-        timer.schedule(task, NO_DELAY, TIMER_INTERVAL);
+    @Override
+    protected void onDestroy() {
+        stopVPNService();
+        super.onDestroy();
     }
-
-    /**
-     * A native method that is implemented by the 'native-lib' native library,
-     * which is packaged with this application.
-     */
-    public native int requestSocket();
-
-    public native String requestAddress();
-
-    public native String tik();
-
-    public native void terminateTunnel();
 }

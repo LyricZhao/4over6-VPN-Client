@@ -41,8 +41,8 @@ struct Message {
 const Message ip_request = {sizeof(u32) + sizeof(u8), IP_REQUEST};
 const Message heartbeat = {sizeof(u32) + sizeof(u8), HEARTBEAT};
 
-// Socket to server
-int sockfd = -1;
+// File descriptor
+int sockfd = -1, tunfd;
 
 // Counters
 u32 time_connected, time_last_heartbeat, time_send_heartbeat;
@@ -71,7 +71,7 @@ void terminate() {
 }
 
 // APIs
-extern "C" JNIEXPORT jstring JNICALL Java_com_lyricz_a4over6vpn_MainActivity_tik(JNIEnv* env, jobject /* this */) {
+extern "C" JNIEXPORT jstring JNICALL Java_com_lyricz_a4over6vpn_VPNService_tik(JNIEnv* env, jobject /* this */) {
   ++ time_connected;
   if (time_connected - time_last_heartbeat > 60) {
     terminate();
@@ -93,15 +93,19 @@ extern "C" JNIEXPORT jstring JNICALL Java_com_lyricz_a4over6vpn_MainActivity_tik
   return env -> NewStringUTF(str);
 }
 
-extern "C" JNIEXPORT jint JNICALL Java_com_lyricz_a4over6vpn_MainActivity_requestSocket(JNIEnv* env, jobject /* this */) {
+extern "C" JNIEXPORT void JNICALL Java_com_lyricz_a4over6vpn_VPNService_setTunnel(JNIEnv* env, jobject /* this */, jint fd) {
+  tunfd = fd;
+}
+
+extern "C" JNIEXPORT jint JNICALL Java_com_lyricz_a4over6vpn_VPNService_openSocket(JNIEnv* env, jobject /* this */) {
   return (jint) 0;
 }
 
-extern "C" JNIEXPORT jstring JNICALL Java_com_lyricz_a4over6vpn_MainActivity_requestAddress(JNIEnv* env, jobject /* this */) {
+extern "C" JNIEXPORT jstring JNICALL Java_com_lyricz_a4over6vpn_VPNService_requestAddress(JNIEnv* env, jobject /* this */) {
   return env -> NewStringUTF("");
 }
 
-extern "C" JNIEXPORT void JNICALL Java_com_lyricz_a4over6vpn_MainActivity_terminateTunnel(JNIEnv* env, jobject /* this */) {
+extern "C" JNIEXPORT void JNICALL Java_com_lyricz_a4over6vpn_VPNService_closeSocket(JNIEnv* env, jobject /* this */) {
   if (sockfd == -1) return;
 
   terminate();
