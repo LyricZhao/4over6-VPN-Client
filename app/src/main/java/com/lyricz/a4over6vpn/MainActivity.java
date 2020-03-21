@@ -1,12 +1,17 @@
 package com.lyricz.a4over6vpn;
 
 import android.Manifest;
+import android.annotation.SuppressLint;
 import android.content.Context;
+import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.net.VpnService;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
+import android.widget.Toast;
+import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import android.os.Bundle;
 import android.widget.TextView;
@@ -74,67 +79,105 @@ public class MainActivity extends AppCompatActivity {
     private static Handler ui = new Handler(Looper.getMainLooper());
 
     // Parameters
+    static int NO_DELAY = 0;
     static int TIMER_INTERVAL = 1000;
+    static int VPN_INTENT_REQUEST = 0;
     static String TAG = "MainActivity";
 
     // UI components
     private TextView statisticsView;
 
     // Variables
-    private boolean running;
+    int sockfd;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        running = false;
+        sockfd = -1;
 
         // Link cache directory
         Pipe.directory = getApplicationContext().getCacheDir();
 
         // Link UI components
-        linkUI();
-
-        // For data statistics
-        startStatisticsTimer();
-    }
-
-    protected void linkUI() {
         statisticsView = findViewById(R.id.statistics);
+
+        // For debug
+//        connect();
     }
 
-    protected void startStatisticsTimer() {
+    // Press button and connect
+    @SuppressLint("Assert")
+    protected void connect() {
+        assert(sockfd == -1);
+
+        Intent intent = VpnService.prepare(MainActivity.this);
+        startActivityForResult(intent, VPN_INTENT_REQUEST);
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
+        if (requestCode == VPN_INTENT_REQUEST) {
+            sockfd = requestSocket();
+            String settings = requestAddress();
+            if (settings.isEmpty()) {
+                Toast.makeText(this, "Failed to connect", Toast.LENGTH_SHORT).show();
+                return;
+            }
+
+            Intent intent = new Intent(this, VPNService.class);
+
+            intent.putExtra("sockfd", sockfd);
+            intent.putExtra("info", settings);
+        } else {
+            super.onActivityResult(requestCode, resultCode, data);
+        }
+    }
+
+    // Terminate tunnel
+    protected void terminate() {
+        // Terminate backend
+        terminateTunnel();
+    }
+
+    // Timer
+    protected void startTimer() {
         Timer timer = new Timer();
         TimerTask task = new TimerTask() {
             @Override
             public void run() {
-                if (!running) {
-                    cancel();
-                }
-                String info = getBackendStatistics();
+                String info = tik();
+                sockfd = info.isEmpty() ? -1 : sockfd;
 
-                // Update UI
-                Runnable update = new Runnable() {
-                    @Override
-                    public void run() {
-                        statisticsView.setText(info);
-                    }
-                };
-                ui.post(update);
+                if (sockfd == -1) {
+                    cancel();
+                    terminateTunnel();
+                } else {
+                    // Update UI
+                    Runnable update = new Runnable() {
+                        @Override
+                        public void run() {
+                            statisticsView.setText(info);
+                        }
+                    };
+                    ui.post(update);
+                }
             }
         };
 
-        timer.schedule(task, 0, TIMER_INTERVAL);
+        timer.schedule(task, NO_DELAY, TIMER_INTERVAL);
     }
 
     /**
      * A native method that is implemented by the 'native-lib' native library,
      * which is packaged with this application.
      */
-    public native String getBackendStatistics();
+    public native int requestSocket();
 
-    public native void createBackendTunnel();
+    public native String requestAddress();
 
-    public native void terminateBackendTunnel();
+    public native String tik();
+
+    public native void terminateTunnel();
 }
