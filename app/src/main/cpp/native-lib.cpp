@@ -234,6 +234,7 @@ extern "C" JNIEXPORT void JNICALL Java_com_lyricz_a4over6vpn_VPNService_backend(
 
   // Terminate
   shutdown(sockfd, SHUT_RDWR);
+  debug("Socket shutdown (normal case)");
   sockfd = -1;
   debug("Backend thread quits");
 }
@@ -310,9 +311,9 @@ extern "C" JNIEXPORT jstring JNICALL Java_com_lyricz_a4over6vpn_VPNService_reque
     elapsed += REQUEST_CHECK_INTERVAL_USEC;
   }
   ip_requesting = false;
-  debug("IP Request timeout");
 
   shutdown(sockfd, SHUT_RDWR);
+  debug("Socket shutdown (IP Request timeout)");
   sockfd = -1;
   return env -> NewStringUTF("");
 }
