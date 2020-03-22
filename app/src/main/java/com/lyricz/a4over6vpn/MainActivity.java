@@ -11,6 +11,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
+import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 import androidx.annotation.Nullable;
@@ -27,6 +28,7 @@ public class MainActivity extends AppCompatActivity {
 
     // UI components
     private TextView statisticsView;
+    private EditText addrEdit, portEdit;
     public static String UI_FILTER = "UI_CHANGE";
     public static String UI_STATUS = "UI_STATUS";
 
@@ -41,6 +43,8 @@ public class MainActivity extends AppCompatActivity {
 
         // Link UI components
         statisticsView = findViewById(R.id.statistics);
+        addrEdit = findViewById(R.id.addrEdit);
+        portEdit = findViewById(R.id.portEdit);
 
         // UI broadcast receiver
         BroadcastReceiver receiver = new BroadcastReceiver() {
@@ -54,7 +58,7 @@ public class MainActivity extends AppCompatActivity {
         registerReceiver(receiver, filter);
 
         // For debug
-        startVPNService();
+//        startVPNService();
     }
 
     // Press button and connect
@@ -67,6 +71,8 @@ public class MainActivity extends AppCompatActivity {
     protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
         if (requestCode == VPN_INTENT_REQUEST) {
             Intent intent = new Intent(this, VPNService.class);
+            intent.putExtra("addr", addrEdit.getText());
+            intent.putExtra("port", addrEdit.getText());
             Log.i(TAG, "System VPN service begins running");
             startService(intent);
         } else {

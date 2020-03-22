@@ -7,14 +7,66 @@
         android:layout_height="match_parent"
         tools:context=".MainActivity">
 
+    <Button
+            android:text="@string/connect_text"
+            android:layout_width="183dp"
+            android:layout_height="80dp"
+            android:id="@+id/connectButton"
+            android:textSize="24sp"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent" app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintBottom_toTopOf="@+id/addrText" android:layout_marginTop="160dp"
+            android:layout_marginBottom="64dp" android:textAlignment="center" android:textAllCaps="false"/>
+    <TextView
+            android:text="@string/address_text"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" android:id="@+id/addrText" android:layout_weight="1"
+            android:textSize="18sp" android:textStyle="italic"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent" app:layout_constraintTop_toBottomOf="@+id/connectButton"
+            app:layout_constraintBottom_toTopOf="@+id/addrEdit"/>
+    <EditText
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:inputType="textPersonName"
+            android:text="@string/default_addr"
+            android:ems="10"
+            android:id="@+id/addrEdit"
+            android:textAlignment="center" tools:ignore="Autofill,LabelFor,MissingConstraints"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintBottom_toTopOf="@+id/portText" app:layout_constraintTop_toBottomOf="@+id/addrText"
+            android:layout_marginBottom="32dp"/>
+    <TextView
+            android:text="@string/port_text"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:id="@+id/portText" android:textSize="18sp"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintBottom_toTopOf="@+id/portEdit"
+            app:layout_constraintTop_toBottomOf="@+id/addrEdit" android:textStyle="italic"/>
+    <EditText
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:inputType="textPersonName"
+            android:text="@string/default_port"
+            android:ems="10"
+            android:id="@+id/portEdit"
+            android:textAlignment="center"
+            tools:ignore="Autofill,LabelFor"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintBottom_toTopOf="@+id/statistics"
+            app:layout_constraintTop_toBottomOf="@+id/portText" android:layout_marginBottom="72dp"/>
     <TextView
             android:id="@+id/statistics"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="@string/data_statistics_bar"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintLeft_toLeftOf="parent"
-            app:layout_constraintRight_toRightOf="parent"
-            app:layout_constraintTop_toTopOf="parent"/>
+            app:layout_constraintTop_toBottomOf="@+id/portEdit" app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent" app:layout_constraintBottom_toBottomOf="parent"
+            android:layout_marginBottom="160dp" android:textAlignment="center"
+            android:fontFamily="sans-serif-condensed-medium"/>
 
 </androidx.constraintlayout.widget.ConstraintLayout>

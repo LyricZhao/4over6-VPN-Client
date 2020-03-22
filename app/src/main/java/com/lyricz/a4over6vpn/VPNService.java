@@ -29,7 +29,7 @@ public class VPNService extends VpnService {
     @SuppressLint("Assert")
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        sockfd = open();
+        sockfd = open(intent.getStringExtra("addr"), intent.getStringExtra("port"));
         String info = request();
         if (info.isEmpty()) {
             Toast.makeText(this, "Failed to connect", Toast.LENGTH_SHORT).show();
@@ -98,7 +98,7 @@ public class VPNService extends VpnService {
      * which is packaged with this application.
      */
     // Open a new socket
-    public native int open();
+    public native int open(String addr, String port);
 
     // Request for a VPN address
     public native String request();

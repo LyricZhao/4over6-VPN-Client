@@ -8,10 +8,18 @@
 # include <cassert>
 # include <cstdio>
 # include <cstring>
+# include <fcntl.h>
+# include <pthread.h>
 # include <string>
+# include <sys/stat.h>
+# include <unistd.h>
 
 // Networks
+# include <arpa/inet.h>
 # include <netdb.h>
+# include <netinet/in.h>
+# include <netinet/ip.h>
+# include <netinet/tcp.h>
 # include <sys/socket.h>
 
 // Defines & Macros
@@ -104,16 +112,16 @@ int send_ip_request() {
 
 bool recv_message(Message &message) {
   int size;
-  size = recv_raw(sockfd, (void *) &message, sizeof(u32));
+  size = recv_raw((u8 *) &message, sizeof(u32));
   if (size < sizeof(u32)) {
     return false;
   }
 
-  size = recv_raw(sockfd, (void *) &packet + sizeof(u32), message.length - sizeof(u32));
+  size = recv_raw(((u8 *) &message) + sizeof(u32), message.length - sizeof(u32));
   return (size + sizeof(u32)) == message.length;
 }
 
-void send_thread() {
+void* send_thread(void *_) {
   Message message;
   while (running) { // 'running' is volatile
     memset(&message, 0, sizeof(message));
@@ -122,39 +130,41 @@ void send_thread() {
       message.length = length + sizeof(u32) + sizeof(u8);
       message.type = NET_REQUEST;
 
-      send_raw(sockfd, (void*) &message, message.length);
+      send_raw((void*) &message, message.length);
 
       bytes_sent += message.length;
     }
   }
+  return nullptr;
 }
 
-void recv_thread() {
+void* recv_thread(void *_) {
   Message message;
   while (running) {
     if (!recv_message(message)) {
       break;
     }
 
-    switch (message.type) {
-      case NET_REPLY:
-        int length = message.length - sizeof(u32) - sizeof(u8);
-        if (length != write(tunfd, message.data, length)) {
-          debug("System tunnel down");
-          goto end;
-        }
-        bytes_recv += message.length;
+    if (message.type == NET_REPLY) {
+      int length = message.length - sizeof(u32) - sizeof(u8);
+      if (length != write(tunfd, message.data, length)) {
+        debug("System tunnel down");
         break;
-      case HEARTBEAT:
-        time_last_heartbeat = time_connected;
-        debug("Heartbeat received (time: %d)", time_last_heartbeat);
-        break;
-      default:
-        debug("Unknown type (%d) packet received", message.type);
-        break;
+      }
+      bytes_recv += message.length;
+    } else if (message.type == HEARTBEAT) {
+      time_last_heartbeat = time_connected;
+      debug("Heartbeat received (time: %d)", time_last_heartbeat);
+    } else {
+      debug("Unknown type (%d) packet received", message.type);
     }
   }
-end:
+  return nullptr;
+}
+
+void terminate() {
+  assert(running);
+  running = false;
 }
 
 // APIs
@@ -206,16 +216,16 @@ extern "C" JNIEXPORT jint JNICALL Java_com_lyricz_a4over6vpn_VPNService_open(JNI
   const char* port = env -> GetStringUTFChars(j_port, 0);
 
   addrinfo hint, *list;
-  memset(&hints, 0, sizeof(hints));
-  hints.ai_family = AF_UNSPEC;
-  hints.ai_socktype = SOCK_STREAM;
+  memset(&hint, 0, sizeof(hint));
+  hint.ai_family = AF_UNSPEC;
+  hint.ai_socktype = SOCK_STREAM;
 
   debug("Trying to connect %s (port: %s)", addr, port);
   if (getaddrinfo(addr, port, &hint, &list)) {
     return (jint) (-1);
   }
 
-  for (addinfo *ptr = list; ptr != nullptr; ptr = ptr -> ai_next) {
+  for (addrinfo *ptr = list; ptr != nullptr; ptr = ptr -> ai_next) {
     debug("Creating socket at family@%d, type@%d, protocol@%d", ptr -> ai_family, ptr -> ai_socktype, ptr -> ai_protocol);
     sockfd = socket(ptr -> ai_family, ptr -> ai_socktype, ptr -> ai_protocol);
     if (sockfd < 0) {
@@ -242,7 +252,8 @@ extern "C" JNIEXPORT jint JNICALL Java_com_lyricz_a4over6vpn_VPNService_open(JNI
 // Apply for a VPN Address
 extern "C" JNIEXPORT jstring JNICALL Java_com_lyricz_a4over6vpn_VPNService_request(JNIEnv* env, jobject /* this */) {
   if (sockfd == -1) {
-    goto failed;
+      sockfd = -1;
+      return env -> NewStringUTF("");
   }
   send_ip_request();
 
@@ -251,19 +262,18 @@ extern "C" JNIEXPORT jstring JNICALL Java_com_lyricz_a4over6vpn_VPNService_reque
   Message message;
   while (elapsed < REQUEST_TIMEOUT_USEC) {
     if (!recv_message(message)) {
-      goto failed;
+      break;
     }
 
     if (message.type == IP_REPLY) {
       debug("Received IP reply: %s", message.data);
-      return env -> NewStringUTF(message.data);
+      return env -> NewStringUTF((const char *) message.data);
     }
 
     usleep(REQUEST_CHECK_INTERVAL_USEC);
     elapsed += REQUEST_CHECK_INTERVAL_USEC;
   }
 
-failed:
   sockfd = -1;
   return env -> NewStringUTF("");
 }
@@ -272,6 +282,5 @@ failed:
 extern "C" JNIEXPORT void JNICALL Java_com_lyricz_a4over6vpn_VPNService_terminate(JNIEnv* env, jobject /* this */) {
   if (sockfd == -1) return;
 
-  assert(running);
-  running = false;
+  terminate();
 }
