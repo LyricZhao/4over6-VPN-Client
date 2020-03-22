@@ -33,6 +33,7 @@ public class MainActivity extends AppCompatActivity {
     public static String UI_CREATE = "UI_CREATE";
     public static String UI_FAILED = "UI_FAILED";
     public static String UI_END    = "UI_END";
+    public static String UI_ERROR  = "UI_ERROR";
 
     // Intent Extra
     public static String INTENT_ADDR = "addr";
@@ -71,11 +72,21 @@ public class MainActivity extends AppCompatActivity {
                     statisticsView.setText(R.string.default_statistics);
                     connectButton.setClickable(true);
                     connectButton.setText(R.string.connect_text);
+                    connected = false;
                 } else if (status.equals(UI_END)) {
-                    // Restore button
+                    // Normal end & Restore button
                     statisticsView.setText(R.string.default_statistics);
                     connectButton.setClickable(true);
                     connectButton.setText(R.string.connect_text);
+                    connected = false;
+                } else if(status.equals(UI_ERROR)) {
+                    // Error end
+                    Toast.makeText(ui, "Connection is down", Toast.LENGTH_SHORT).show();
+                    stopVPNService();
+                    statisticsView.setText(R.string.default_statistics);
+                    connectButton.setClickable(true);
+                    connectButton.setText(R.string.connect_text);
+                    connected = false;
                 } else {
                     // Update statistics
                     statisticsView.setText(status);
@@ -103,7 +114,6 @@ public class MainActivity extends AppCompatActivity {
             stopVPNService();
             // Button will change to clickable after destroying service
             connectButton.setClickable(false);
-            connected = false;
         } else {
             startVPNService();
         }

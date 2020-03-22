@@ -10,8 +10,10 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.net.VpnService;
+import android.os.ParcelFileDescriptor;
 import android.util.Log;
 
+import java.io.IOException;
 import java.util.Objects;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -36,6 +38,7 @@ public class VPNService extends VpnService {
     Timer timer = null;
     TimerTask task = null;
     BroadcastReceiver receiver;
+    ParcelFileDescriptor fdInterface;
 
     @SuppressLint("Assert")
     @Override
@@ -49,6 +52,18 @@ public class VPNService extends VpnService {
                 sockfd = -1;
                 terminate();
                 unregisterReceiver(this);
+
+                // Close interface
+                try {
+                    if (fdInterface != null) {
+                        fdInterface.close();
+                        fdInterface = null;
+                    }
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+
+                // Cancel timer
                 if (timer != null) {
                     task.cancel();
                     timer.cancel();
@@ -81,14 +96,17 @@ public class VPNService extends VpnService {
 
             // Configure
             Builder builder = new Builder();
-            int tunfd = Objects.requireNonNull(builder.setSession("4over6 VPN Session")
+            fdInterface = builder.setSession("4over6 VPN Session")
                     .addAddress(settings[0], 24)    // ip
                     .addRoute(settings[1], 0)       // route
                     .addDnsServer(settings[2])                  // dns0
                     .addDnsServer(settings[3])                  // dns1
                     .addDnsServer(settings[4])                  // dns2
                     .setMtu(MTU)                                // mtu
-                    .establish()).getFd();
+                    .establish();
+
+            assert fdInterface != null;
+            int tunfd = fdInterface.getFd();
 
             backend = new BackendThread(tunfd);
             backend.start();
@@ -148,7 +166,7 @@ public class VPNService extends VpnService {
     public native String tik();
 
     // Run backend
-    public native void backend(int fd);
+    public native boolean backend(int fd);
 
     // Terminate all
     public native void terminate();
@@ -163,8 +181,7 @@ public class VPNService extends VpnService {
 
         @Override
         public void run() {
-            backend(tunfd);
-            notifyUI(MainActivity.UI_END);
+            notifyUI(backend(tunfd) ? MainActivity.UI_ERROR: MainActivity.UI_END);
         }
     }
 }
