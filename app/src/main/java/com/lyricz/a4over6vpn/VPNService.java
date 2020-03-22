@@ -96,9 +96,9 @@ public class VPNService extends VpnService {
             startTimer();
 
             notifyUI(MainActivity.UI_CREATE);
-            return START_NOT_STICKY;
+            return START_STICKY;
         }
-        return START_NOT_STICKY;
+        return START_STICKY;
     }
 
     protected void notifyUI(String info) {
@@ -116,11 +116,11 @@ public class VPNService extends VpnService {
             public void run() {
                 if (sockfd != -1) {
                     String info = tik();
-                    if (info.isEmpty()) {
+                    if (!info.isEmpty()) {
+                        notifyUI(info);
+                    } else {
                         sockfd = -1;
-                        info = MainActivity.UI_BREAK;
                     }
-                    notifyUI(info);
                 }
             }
         };

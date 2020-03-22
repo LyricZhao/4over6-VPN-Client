@@ -32,7 +32,6 @@ public class MainActivity extends AppCompatActivity {
     public static String UI_STATUS = "UI_STATUS";
     public static String UI_CREATE = "UI_CREATE";
     public static String UI_FAILED = "UI_FAILED";
-    public static String UI_BREAK  = "UI_BREAK";
     public static String UI_END    = "UI_END";
 
     // Intent Extra
@@ -62,28 +61,24 @@ public class MainActivity extends AppCompatActivity {
             public void onReceive(Context context, Intent intent) {
                 String status = intent.getStringExtra(UI_STATUS);
                 assert(status != null);
-                if (status.equals(UI_BREAK)) {
+                if (status.equals(UI_CREATE)) {
+                    connectButton.setClickable(true);
+                    connectButton.setText(R.string.disconnect_text);
+                    connected = true;
+                } else if (status.equals(UI_FAILED)) {
+                    Toast.makeText(ui, "Failed to connect", Toast.LENGTH_SHORT).show();
                     stopVPNService();
+                    statisticsView.setText(R.string.default_statistics);
+                    connectButton.setClickable(true);
+                    connectButton.setText(R.string.connect_text);
+                } else if (status.equals(UI_END)) {
+                    // Restore button
+                    statisticsView.setText(R.string.default_statistics);
+                    connectButton.setClickable(true);
+                    connectButton.setText(R.string.connect_text);
                 } else {
-                    if (status.equals(UI_CREATE)) {
-                        connectButton.setClickable(true);
-                        connectButton.setText(R.string.disconnect_text);
-                        connected = true;
-                    } else if (status.equals(UI_FAILED)) {
-                        Toast.makeText(ui, "Failed to connect", Toast.LENGTH_SHORT).show();
-                        stopVPNService();
-                        statisticsView.setText(R.string.default_statistics);
-                        connectButton.setClickable(true);
-                        connectButton.setText(R.string.connect_text);
-                    } else if (status.equals(UI_END)) {
-                        // Restore button
-                        statisticsView.setText(R.string.default_statistics);
-                        connectButton.setClickable(true);
-                        connectButton.setText(R.string.connect_text);
-                    } else {
-                        // Update statistics
-                        statisticsView.setText(status);
-                    }
+                    // Update statistics
+                    statisticsView.setText(status);
                 }
             }
         };

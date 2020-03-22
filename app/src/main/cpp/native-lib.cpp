@@ -38,7 +38,7 @@ typedef unsigned int u32;
 # define REQUEST_CHECK_INTERVAL_USEC  5000
 # define RECV_CHECK_INTEVAL           100
 # define RECONNECT_LIMIT              3
-# define SOCKET_TIMEOUT               2000
+# define SOCKET_TIMEOUT               2
 
 # define IP_REQUEST   100
 # define IP_REPLY     101
@@ -147,7 +147,7 @@ int send_ip_request() {
 bool recv_message(Message &message) {
   int size;
   size = recv_raw((u8 *) &message, sizeof(u32));
-  if (size < sizeof(u32) || !running) {
+  if (size < sizeof(u32) || (!running && !ip_requesting)) {
     return false;
   }
 
@@ -263,7 +263,7 @@ extern "C" JNIEXPORT jint JNICALL Java_com_lyricz_a4over6vpn_VPNService_open(JNI
   const char* port = env -> GetStringUTFChars(j_port, 0);
 
   addrinfo hint, *list;
-  memset(&hint, 0, sizeof(hint));
+  memset(&hint, 0, sizeof(addrinfo));
   hint.ai_family = AF_UNSPEC;
   hint.ai_socktype = SOCK_STREAM;
 
@@ -284,9 +284,9 @@ extern "C" JNIEXPORT jint JNICALL Java_com_lyricz_a4over6vpn_VPNService_open(JNI
     setsockopt(sockfd, IPPROTO_TCP, TCP_NODELAY, &enable, sizeof(u32));
 
     // Set timeout
-    u32 timeout = SOCKET_TIMEOUT;
-    setsockopt(sockfd, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(u32));
-    setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(u32));
+    timeval timeout = {SOCKET_TIMEOUT, 0};
+    setsockopt(sockfd, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout));
+    setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
 
     if (connect(sockfd, ptr -> ai_addr, ptr -> ai_addrlen) == 0) {
       debug("Success");
@@ -294,6 +294,7 @@ extern "C" JNIEXPORT jint JNICALL Java_com_lyricz_a4over6vpn_VPNService_open(JNI
       sock_len = ptr -> ai_addrlen;
       break;
     } else {
+      shutdown(sockfd, SHUT_RDWR);
       sockfd = -1;
       debug("connect() failed");
     }
