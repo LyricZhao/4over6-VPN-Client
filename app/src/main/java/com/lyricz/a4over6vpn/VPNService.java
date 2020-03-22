@@ -1,11 +1,8 @@
 package com.lyricz.a4over6vpn;
 
 import android.annotation.SuppressLint;
-import android.app.Service;
-import android.content.Context;
 import android.content.Intent;
 import android.net.VpnService;
-import android.os.IBinder;
 import android.widget.Toast;
 
 import java.util.Objects;
@@ -27,12 +24,13 @@ public class VPNService extends VpnService {
 
     // Variables
     int sockfd;
+    BackendThread backend;
 
     @SuppressLint("Assert")
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        sockfd = openSocket();
-        String info = requestAddress();
+        sockfd = open();
+        String info = request();
         if (info.isEmpty()) {
             Toast.makeText(this, "Failed to connect", Toast.LENGTH_SHORT).show();
             stopSelf();
@@ -54,7 +52,9 @@ public class VPNService extends VpnService {
                     .setMtu(MTU)                                // mtu
                     .establish()).getFd();
 
-            setTunnel(tunfd);
+            backend = new BackendThread(tunfd);
+            backend.start();
+
             startTimer();
 
             // TODO: return pattern
@@ -89,7 +89,7 @@ public class VPNService extends VpnService {
 
     @Override
     public void onDestroy() {
-        closeSocket();
+        terminate();
         super.onDestroy();
     }
 
@@ -97,13 +97,32 @@ public class VPNService extends VpnService {
      * A native method that is implemented by the 'native-lib' native library,
      * which is packaged with this application.
      */
-    public native int openSocket();
+    // Open a new socket
+    public native int open();
 
-    public native String requestAddress();
+    // Request for a VPN address
+    public native String request();
 
+    // Tik-tok
     public native String tik();
 
-    public native void setTunnel(int fd);
+    // Run backend
+    public native void backend(int fd);
 
-    public native void closeSocket();
+    // Terminate all
+    public native void terminate();
+
+    // Thread supporting backend
+    class BackendThread extends Thread {
+        int tunfd;
+
+        public BackendThread(int tunfd) {
+            this.tunfd = tunfd;
+        }
+
+        @Override
+        public void run() {
+            backend(tunfd);
+        }
+    }
 }
