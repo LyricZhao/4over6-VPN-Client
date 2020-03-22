@@ -1,3 +1,7 @@
+// Java UI of 4over6 VPN client
+// 2020 Network Training, Tsinghua University
+// Chenggang Zhao & Yuxian Gu
+
 package com.lyricz.a4over6vpn;
 
 import android.content.BroadcastReceiver;

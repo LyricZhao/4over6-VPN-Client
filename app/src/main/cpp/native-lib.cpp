@@ -1,4 +1,6 @@
 // C++ backend of 4over6 VPN client
+// 2020 Network Training, Tsinghua University
+// Chenggang Zhao & Yuxian Gu
 
 // Android Includes
 # include <android/log.h>
@@ -64,7 +66,7 @@ u32 time_connected, time_last_heartbeat, time_send_heartbeat;
 u32 bytes_sent, bytes_recv;
 volatile bool running = false, ip_requesting = false;
 
-// Utilities
+// Utilities - print pretty time and size
 std::string pretty(u32 value, u32 scale, const char* *units, int m) {
   int count = 0;
   while (value > scale && count < m - 1) {
@@ -86,6 +88,7 @@ std::string prettyTime(u32 time) {
   return pretty(time, 60, units, 2);
 }
 
+// Send raw
 int send_raw(void* ptr, u32 length) {
   // Already terminate
   if (!running && !ip_requesting) {
@@ -100,6 +103,7 @@ int send_raw(void* ptr, u32 length) {
   return sent;
 }
 
+// Receive raw
 int recv_raw(u8 *buffer, u32 length) {
   int received = 0;
   while ((running || ip_requesting) && (received < length)) {
@@ -120,14 +124,17 @@ int recv_raw(u8 *buffer, u32 length) {
   return received;
 }
 
+// Send heartbeat
 int send_heartbeat() {
   return send_raw((void *) &heartbeat, heartbeat.length);
 }
 
+// Send IP request
 int send_ip_request() {
   return send_raw((void *) &ip_request, ip_request.length);
 }
 
+// Waiting for a message
 bool recv_message(Message &message) {
   int size;
   size = recv_raw((u8 *) &message, sizeof(u32));
@@ -139,6 +146,7 @@ bool recv_message(Message &message) {
   return (size + sizeof(u32)) == message.length;
 }
 
+// Sender thread
 void* send_thread(void *_) {
   Message message;
   while (running) { // 'running' is volatile
@@ -157,6 +165,7 @@ void* send_thread(void *_) {
   return nullptr;
 }
 
+// Receiver thread
 void* recv_thread(void *_) {
   Message message;
   while (running) {
@@ -303,6 +312,7 @@ extern "C" JNIEXPORT jstring JNICALL Java_com_lyricz_a4over6vpn_VPNService_reque
   ip_requesting = false;
   debug("IP Request timeout");
 
+  shutdown(sockfd, SHUT_RDWR);
   sockfd = -1;
   return env -> NewStringUTF("");
 }
