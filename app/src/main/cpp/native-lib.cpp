@@ -37,8 +37,8 @@ typedef unsigned int u32;
 # define REQUEST_TIMEOUT_USEC         2000000
 # define REQUEST_CHECK_INTERVAL_USEC  5000
 # define RECV_CHECK_INTEVAL           100
-# define RECONNECT_LIMIT              30
-# define SOCKET_TIMEOUT               2
+# define RECONNECT_LIMIT              3
+# define SOCKET_TIMEOUT               2000
 
 # define IP_REQUEST   100
 # define IP_REPLY     101
@@ -105,19 +105,28 @@ int send_raw(void* ptr, u32 length) {
 
 // Receive raw
 int recv_raw(u8 *buffer, u32 length) {
-  int received = 0;
+  int received = 0, times_retry = 0;
+  // Note: there will be no auto shutdown because the protocol does not include an end signal
   while ((running || ip_requesting) && (received < length)) {
     int single = recv(sockfd, buffer + received, length - received, 0);
     if (single < 0) {
       // Timeout
-      break;
+      ++ times_retry;
+      if (times_retry == RECONNECT_LIMIT) {
+        break;
+      }
+      usleep(RECV_CHECK_INTEVAL);
+      debug("Timeout, trying to reconnect");
+      connect(sockfd, sock_addr, sock_len);
+      continue;
     } else if (single == 0) {
       // Not arrived
-      debug("TODO: edge case");
+      times_retry = 0;
       usleep(RECV_CHECK_INTEVAL);
       continue;
     } else {
       // Read
+      times_retry = 0;
       received += single;
     }
   }
@@ -138,7 +147,7 @@ int send_ip_request() {
 bool recv_message(Message &message) {
   int size;
   size = recv_raw((u8 *) &message, sizeof(u32));
-  if (size < sizeof(u32)) {
+  if (size < sizeof(u32) || !running) {
     return false;
   }
 
@@ -195,7 +204,8 @@ void* recv_thread(void *_) {
 // APIs
 // Tik-tok
 extern "C" JNIEXPORT jstring JNICALL Java_com_lyricz_a4over6vpn_VPNService_tik(JNIEnv* env, jobject /* this */) {
-  if (sockfd == -1) {
+  debug("Tiktok");
+  if (sockfd == -1 || !running) { // 'running' for UI delay
     return env -> NewStringUTF("");
   }
 
@@ -241,6 +251,14 @@ extern "C" JNIEXPORT void JNICALL Java_com_lyricz_a4over6vpn_VPNService_backend(
 
 // Apply for a global socket (addr can be a hostname)
 extern "C" JNIEXPORT jint JNICALL Java_com_lyricz_a4over6vpn_VPNService_open(JNIEnv* env, jobject /* this */, jstring j_addr, jstring j_port) {
+  // Cleanup
+  bytes_recv = 0;
+  bytes_sent = 0;
+  time_connected = 0;
+  time_last_heartbeat = 0;
+  time_send_heartbeat = 0;
+  assert(sockfd == -1);
+
   const char* addr = env -> GetStringUTFChars(j_addr, 0);
   const char* port = env -> GetStringUTFChars(j_port, 0);
 
@@ -266,9 +284,9 @@ extern "C" JNIEXPORT jint JNICALL Java_com_lyricz_a4over6vpn_VPNService_open(JNI
     setsockopt(sockfd, IPPROTO_TCP, TCP_NODELAY, &enable, sizeof(u32));
 
     // Set timeout
-    timeval timeout = {SOCKET_TIMEOUT, 0};
-    setsockopt(sockfd, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout));
-    setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
+    u32 timeout = SOCKET_TIMEOUT;
+    setsockopt(sockfd, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(u32));
+    setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(u32));
 
     if (connect(sockfd, ptr -> ai_addr, ptr -> ai_addrlen) == 0) {
       debug("Success");
@@ -276,11 +294,12 @@ extern "C" JNIEXPORT jint JNICALL Java_com_lyricz_a4over6vpn_VPNService_open(JNI
       sock_len = ptr -> ai_addrlen;
       break;
     } else {
+      sockfd = -1;
       debug("connect() failed");
     }
   }
 
-  sockfd = sockfd < 0 ? -1 : sockfd;
+  debug("Open sockfd = %d\n", sockfd);
   return (jint) sockfd;
 }
 

@@ -33,6 +33,7 @@ public class MainActivity extends AppCompatActivity {
     public static String UI_CREATE = "UI_CREATE";
     public static String UI_FAILED = "UI_FAILED";
     public static String UI_BREAK  = "UI_BREAK";
+    public static String UI_END    = "UI_END";
 
     // Intent Extra
     public static String INTENT_ADDR = "addr";
@@ -71,6 +72,14 @@ public class MainActivity extends AppCompatActivity {
                     } else if (status.equals(UI_FAILED)) {
                         Toast.makeText(ui, "Failed to connect", Toast.LENGTH_SHORT).show();
                         stopVPNService();
+                        statisticsView.setText(R.string.default_statistics);
+                        connectButton.setClickable(true);
+                        connectButton.setText(R.string.connect_text);
+                    } else if (status.equals(UI_END)) {
+                        // Restore button
+                        statisticsView.setText(R.string.default_statistics);
+                        connectButton.setClickable(true);
+                        connectButton.setText(R.string.connect_text);
                     } else {
                         // Update statistics
                         statisticsView.setText(status);
@@ -97,6 +106,9 @@ public class MainActivity extends AppCompatActivity {
     public void click(View view) {
         if (connected) {
             stopVPNService();
+            // Button will change to clickable after destroying service
+            connectButton.setClickable(false);
+            connected = false;
         } else {
             startVPNService();
         }
@@ -128,11 +140,6 @@ public class MainActivity extends AppCompatActivity {
         Intent stop = new Intent();
         stop.setAction(VPNService.COMMAND);
         sendBroadcast(stop);
-
-        statisticsView.setText(R.string.default_statistics);
-        connectButton.setClickable(true);
-        connectButton.setText(R.string.connect_text);
-        connected = false;
     }
 
     @Override

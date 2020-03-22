@@ -33,18 +33,28 @@ public class VPNService extends VpnService {
     // Variables
     int sockfd;
     BackendThread backend;
+    Timer timer = null;
+    TimerTask task = null;
+    BroadcastReceiver receiver;
 
     @SuppressLint("Assert")
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         // Receive MainActivity command
-        BroadcastReceiver receiver = new BroadcastReceiver() {
+        receiver = new BroadcastReceiver() {
             @Override
             public void onReceive(Context context, Intent intent) {
                 // The only way to stop
                 Log.d(TAG, "Get stop request from main");
+                sockfd = -1;
                 terminate();
                 unregisterReceiver(this);
+                if (timer != null) {
+                    task.cancel();
+                    timer.cancel();
+                    task = null;
+                    timer = null;
+                }
                 stopSelf();
             }
         };
@@ -100,17 +110,18 @@ public class VPNService extends VpnService {
 
     // Timer
     protected void startTimer() {
-        Timer timer = new Timer();
-        TimerTask task = new TimerTask() {
+        timer = new Timer();
+        task = new TimerTask() {
             @Override
             public void run() {
-                String info = tik();
-                if (info.isEmpty()) {
-                    sockfd = -1;
-                    info = MainActivity.UI_BREAK;
-                    cancel();
+                if (sockfd != -1) {
+                    String info = tik();
+                    if (info.isEmpty()) {
+                        sockfd = -1;
+                        info = MainActivity.UI_BREAK;
+                    }
+                    notifyUI(info);
                 }
-                notifyUI(info);
             }
         };
 
@@ -153,6 +164,7 @@ public class VPNService extends VpnService {
         @Override
         public void run() {
             backend(tunfd);
+            notifyUI(MainActivity.UI_END);
         }
     }
 }
