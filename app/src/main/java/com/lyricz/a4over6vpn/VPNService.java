@@ -3,7 +3,7 @@ package com.lyricz.a4over6vpn;
 import android.annotation.SuppressLint;
 import android.content.Intent;
 import android.net.VpnService;
-import android.widget.Toast;
+import android.util.Log;
 
 import java.util.Objects;
 import java.util.Timer;
@@ -29,11 +29,15 @@ public class VPNService extends VpnService {
     @SuppressLint("Assert")
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        sockfd = open(intent.getStringExtra("addr"), intent.getStringExtra("port"));
+        String addr = intent.getStringExtra(MainActivity.INTENT_ADDR);
+        String port = intent.getStringExtra(MainActivity.INTENT_PORT);
+        Log.d(TAG, "Start VPN Service with " + addr + "@" + port);
+
+        sockfd = open(addr, port);
         String info = request();
+
         if (info.isEmpty()) {
-            Toast.makeText(this, "Failed to connect", Toast.LENGTH_SHORT).show();
-            stopSelf();
+            notifyUI(MainActivity.UI_FAILED);
         } else {
             // The socket for VPN itself must be protected
             protect(sockfd);
@@ -57,10 +61,17 @@ public class VPNService extends VpnService {
 
             startTimer();
 
-            // TODO: return pattern
+            notifyUI(MainActivity.UI_CREATE);
             return START_STICKY;
         }
         return START_STICKY;
+    }
+
+    protected void notifyUI(String info) {
+        Intent ui = new Intent();
+        ui.setAction(MainActivity.UI_FILTER);
+        ui.putExtra(MainActivity.UI_STATUS, info);
+        sendBroadcast(ui);
     }
 
     // Timer
@@ -71,11 +82,7 @@ public class VPNService extends VpnService {
             public void run() {
                 String info = tik();
                 sockfd = info.isEmpty() ? -1 : sockfd;
-
-                Intent ui = new Intent();
-                ui.setAction(MainActivity.UI_FILTER);
-                ui.putExtra(MainActivity.UI_STATUS, info);
-                sendBroadcast(ui);
+                notifyUI(info);
 
                 if (sockfd == -1) {
                     cancel();
@@ -91,6 +98,7 @@ public class VPNService extends VpnService {
     public void onDestroy() {
         terminate();
         super.onDestroy();
+        Log.d(TAG, "VPN Service destroyed");
     }
 
     /**

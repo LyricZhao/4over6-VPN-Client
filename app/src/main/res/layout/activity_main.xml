@@ -16,7 +16,8 @@
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent" app:layout_constraintTop_toTopOf="parent"
             app:layout_constraintBottom_toTopOf="@+id/addrText" android:layout_marginTop="160dp"
-            android:layout_marginBottom="64dp" android:textAlignment="center" android:textAllCaps="false"/>
+            android:layout_marginBottom="64dp" android:textAlignment="center" android:textAllCaps="false"
+            android:onClick="click"/>
     <TextView
             android:text="@string/address_text"
             android:layout_width="wrap_content"
@@ -24,7 +25,7 @@
             android:textSize="18sp" android:textStyle="italic"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent" app:layout_constraintTop_toBottomOf="@+id/connectButton"
-            app:layout_constraintBottom_toTopOf="@+id/addrEdit"/>
+            app:layout_constraintBottom_toTopOf="@+id/addrEdit" android:layout_marginBottom="20dp"/>
     <EditText
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -45,7 +46,8 @@
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintBottom_toTopOf="@+id/portEdit"
-            app:layout_constraintTop_toBottomOf="@+id/addrEdit" android:textStyle="italic"/>
+            app:layout_constraintTop_toBottomOf="@+id/addrEdit" android:textStyle="italic"
+            android:layout_marginBottom="20dp"/>
     <EditText
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -63,7 +65,7 @@
             android:id="@+id/statistics"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="@string/data_statistics_bar"
+            android:text="@string/default_statistics"
             app:layout_constraintTop_toBottomOf="@+id/portEdit" app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent" app:layout_constraintBottom_toBottomOf="parent"
             android:layout_marginBottom="160dp" android:textAlignment="center"

@@ -63,11 +63,33 @@ u32 time_connected, time_last_heartbeat, time_send_heartbeat;
 u32 bytes_sent, bytes_recv;
 volatile bool running = false;
 
+// Utilities
+std::string pretty(u32 value, u32 scale, const char* *units, int m) {
+  int count = 0;
+  while (value > scale && count < m - 1) {
+    value /= scale;
+    count += 1;
+  }
+  char buffer[PRINT_BUFFER_LENGTH];
+  sprintf(buffer, "%d %s\n", value, units[count]);
+  return std::string(buffer);
+}
+
+std::string prettySize(u32 size) {
+  static const char* units[5] = {"Bytes", "KBytes", "MBytes", "GBytes"};
+  return pretty(size, 1024, units, 5);
+}
+
+std::string prettyTime(u32 time) {
+  static const char* units[2] = {"s", "min(s)"};
+  return pretty(time, 60, units, 2);
+}
+
 int send_raw(void* ptr, u32 length) {
   assert(sockfd != -1);
   int sent = send(sockfd, ptr, length, 0);
   if (sent < length) {
-    error("Failed to write raw sockets");
+    error("Failed to write raw sockets (%d/%d)", sent, length);
     return -1;
   }
   return sent;
@@ -121,6 +143,13 @@ bool recv_message(Message &message) {
   return (size + sizeof(u32)) == message.length;
 }
 
+void terminate() {
+  if (sockfd == -1) return;
+  close(sockfd);
+  sockfd = -1;
+  running = false;
+}
+
 void* send_thread(void *_) {
   Message message;
   while (running) { // 'running' is volatile
@@ -142,6 +171,7 @@ void* recv_thread(void *_) {
   Message message;
   while (running) {
     if (!recv_message(message)) {
+      terminate();
       break;
     }
 
@@ -156,15 +186,10 @@ void* recv_thread(void *_) {
       time_last_heartbeat = time_connected;
       debug("Heartbeat received (time: %d)", time_last_heartbeat);
     } else {
-      debug("Unknown type (%d) packet received", message.type);
+      debug("Unknown type (%d) or IP reply packet received", message.type);
     }
   }
   return nullptr;
-}
-
-void terminate() {
-  assert(running);
-  running = false;
 }
 
 // APIs
@@ -172,6 +197,7 @@ void terminate() {
 extern "C" JNIEXPORT jstring JNICALL Java_com_lyricz_a4over6vpn_VPNService_tik(JNIEnv* env, jobject /* this */) {
   ++ time_connected;
   if (time_connected - time_last_heartbeat > 60) {
+    debug("Not receiving heartbeat for 60 seconds, terminate");
     terminate();
     return env -> NewStringUTF("");
   }
@@ -179,15 +205,12 @@ extern "C" JNIEXPORT jstring JNICALL Java_com_lyricz_a4over6vpn_VPNService_tik(J
   ++ time_send_heartbeat;
   if (time_send_heartbeat == 20) {
     time_send_heartbeat = 0;
+    debug("Time up for 20s, sending heartbeat");
     send_heartbeat();
   }
 
   char str[PRINT_BUFFER_LENGTH];
-  if (time_connected >= 60) {
-    sprintf(str, "Sent: %d bytes\nReceived: %d bytes\nTime connected: %d mins", bytes_sent, bytes_recv, time_connected / 60);
-  } else {
-    sprintf(str, "Sent: %d bytes\nReceived: %d bytes\nTime connected: %d s", bytes_sent, bytes_recv, time_connected);
-  }
+  sprintf(str, "Sent: %s\nReceived: %s\nTime connected: %s", prettySize(bytes_sent).c_str(), prettySize(bytes_recv).c_str(), prettyTime(time_connected).c_str());
   return env -> NewStringUTF(str);
 }
 
@@ -205,9 +228,7 @@ extern "C" JNIEXPORT void JNICALL Java_com_lyricz_a4over6vpn_VPNService_backend(
   pthread_join(receiver, nullptr);
   pthread_join(sender, nullptr);
 
-  close(sockfd);
-  sockfd = -1;
-  tunfd = -1;
+  terminate();
 }
 
 // Apply for a global socket (addr can be a hostname)
@@ -235,7 +256,7 @@ extern "C" JNIEXPORT jint JNICALL Java_com_lyricz_a4over6vpn_VPNService_open(JNI
 
     u32 enable = 1;
     setsockopt(sockfd, IPPROTO_TCP, TCP_NODELAY, &enable, sizeof(u32));
-    if (connect(sockfd, ptr -> ai_addr, ptr -> ai_addrlen)) {
+    if (connect(sockfd, ptr -> ai_addr, ptr -> ai_addrlen) == 0) {
       debug("Success");
       sock_addr = ptr -> ai_addr;
       sock_len = ptr -> ai_addrlen;
@@ -255,6 +276,7 @@ extern "C" JNIEXPORT jstring JNICALL Java_com_lyricz_a4over6vpn_VPNService_reque
       sockfd = -1;
       return env -> NewStringUTF("");
   }
+  debug("Sending IP request");
   send_ip_request();
 
   // Waiting for reply
@@ -282,5 +304,6 @@ extern "C" JNIEXPORT jstring JNICALL Java_com_lyricz_a4over6vpn_VPNService_reque
 extern "C" JNIEXPORT void JNICALL Java_com_lyricz_a4over6vpn_VPNService_terminate(JNIEnv* env, jobject /* this */) {
   if (sockfd == -1) return;
 
+  debug("Terminate by API");
   terminate();
 }
