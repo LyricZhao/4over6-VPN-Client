@@ -1,7 +1,10 @@
 package com.lyricz.a4over6vpn;
 
 import android.annotation.SuppressLint;
+import android.content.BroadcastReceiver;
+import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.net.VpnService;
 import android.util.Log;
 
@@ -21,6 +24,7 @@ public class VPNService extends VpnService {
     static int MTU = 1500;
 
     static String TAG = "VPNService";
+    static String COMMAND = "VPNCommand";
 
     // Variables
     int sockfd;
@@ -29,6 +33,22 @@ public class VPNService extends VpnService {
     @SuppressLint("Assert")
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
+        // Receive MainActivity command
+        BroadcastReceiver receiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                // The only way to stop
+                Log.d(TAG, "Get stop request from main");
+                terminate();
+                unregisterReceiver(this);
+                stopSelf();
+            }
+        };
+        IntentFilter filter = new IntentFilter();
+        filter.addAction(COMMAND);
+        registerReceiver(receiver, filter);
+
+        // Build connection
         String addr = intent.getStringExtra(MainActivity.INTENT_ADDR);
         String port = intent.getStringExtra(MainActivity.INTENT_PORT);
         Log.d(TAG, "Start VPN Service with " + addr + "@" + port);
@@ -62,9 +82,9 @@ public class VPNService extends VpnService {
             startTimer();
 
             notifyUI(MainActivity.UI_CREATE);
-            return START_STICKY;
+            return START_NOT_STICKY;
         }
-        return START_STICKY;
+        return START_NOT_STICKY;
     }
 
     protected void notifyUI(String info) {
@@ -81,13 +101,12 @@ public class VPNService extends VpnService {
             @Override
             public void run() {
                 String info = tik();
-                sockfd = info.isEmpty() ? -1 : sockfd;
-                notifyUI(info);
-
-                if (sockfd == -1) {
+                if (info.isEmpty()) {
+                    sockfd = -1;
+                    info = MainActivity.UI_BREAK;
                     cancel();
-                    stopSelf();
                 }
+                notifyUI(info);
             }
         };
 
@@ -96,9 +115,8 @@ public class VPNService extends VpnService {
 
     @Override
     public void onDestroy() {
-        terminate();
-        super.onDestroy();
         Log.d(TAG, "VPN Service destroyed");
+        super.onDestroy();
     }
 
     /**

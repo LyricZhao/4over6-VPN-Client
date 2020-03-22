@@ -59,16 +59,17 @@
             tools:ignore="Autofill,LabelFor"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintBottom_toTopOf="@+id/statistics"
-            app:layout_constraintTop_toBottomOf="@+id/portText" android:layout_marginBottom="72dp"/>
+            app:layout_constraintTop_toBottomOf="@+id/portText" app:layout_constraintBottom_toBottomOf="parent"
+            android:layout_marginBottom="256dp"/>
     <TextView
             android:id="@+id/statistics"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="@string/default_statistics"
-            app:layout_constraintTop_toBottomOf="@+id/portEdit" app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent" app:layout_constraintBottom_toBottomOf="parent"
-            android:layout_marginBottom="160dp" android:textAlignment="center"
-            android:fontFamily="sans-serif-condensed-medium"/>
+            android:layout_marginBottom="128dp" android:textAlignment="center"
+            android:fontFamily="sans-serif-condensed-medium" app:layout_constraintTop_toTopOf="parent"
+            android:layout_marginTop="512dp"/>
 
 </androidx.constraintlayout.widget.ConstraintLayout>

@@ -28,6 +28,7 @@ public class MainActivity extends AppCompatActivity {
     public static String UI_STATUS = "UI_STATUS";
     public static String UI_CREATE = "UI_CREATE";
     public static String UI_FAILED = "UI_FAILED";
+    public static String UI_BREAK  = "UI_BREAK";
 
     // Intent Extra
     public static String INTENT_ADDR = "addr";
@@ -56,7 +57,7 @@ public class MainActivity extends AppCompatActivity {
             public void onReceive(Context context, Intent intent) {
                 String status = intent.getStringExtra(UI_STATUS);
                 assert(status != null);
-                if (status.isEmpty()) {
+                if (status.equals(UI_BREAK)) {
                     stopVPNService();
                 } else {
                     if (status.equals(UI_CREATE)) {
@@ -80,8 +81,6 @@ public class MainActivity extends AppCompatActivity {
 
     // Try to connect
     protected void startVPNService() {
-        connectButton.setText(R.string.connect_text);
-        connectButton.setClickable(false);
         Intent intent = VpnService.prepare(MainActivity.this);
         // Prepare only once
         if (intent != null) {
@@ -108,6 +107,7 @@ public class MainActivity extends AppCompatActivity {
             if (addr.isEmpty() || port.isEmpty()) {
                 Toast.makeText(this, "Address/Port field can not be empty", Toast.LENGTH_SHORT).show();
             } else {
+                connectButton.setClickable(false);
                 intent.putExtra(INTENT_ADDR, addr);
                 intent.putExtra(INTENT_PORT, port);
                 Log.i(TAG, "System VPN service begins running");
@@ -120,9 +120,13 @@ public class MainActivity extends AppCompatActivity {
 
     // Terminate service
     protected void stopVPNService() {
-        Intent intent = new Intent(this, VPNService.class);
-        stopService(intent);
+        Log.d(TAG, "Trying to stop VPN service");
+        Intent stop = new Intent();
+        stop.setAction(VPNService.COMMAND);
+        sendBroadcast(stop);
+
         statisticsView.setText(R.string.default_statistics);
+        connectButton.setClickable(true);
         connectButton.setText(R.string.connect_text);
         connected = false;
     }
