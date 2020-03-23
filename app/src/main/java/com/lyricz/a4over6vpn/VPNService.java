@@ -14,7 +14,6 @@ import android.os.ParcelFileDescriptor;
 import android.util.Log;
 
 import java.io.IOException;
-import java.util.Objects;
 import java.util.Timer;
 import java.util.TimerTask;
 

@@ -150,11 +150,12 @@ void* send_thread(void *_) {
   Message message;
   while (running) { // 'running' is volatile
     memset(&message, 0, sizeof(Message));
-    u32 length = read(tunfd, message.data, DATA_MAX_LENGTH);
+    int length = read(tunfd, message.data, DATA_MAX_LENGTH);
     if (length > 0) {
       message.length = length + sizeof(u32) + sizeof(u8);
       message.type = NET_REQUEST;
 
+      debug("Sending from send_thread with length = %d", length);
       send_raw((u8*) &message, message.length);
 
       bytes_sent += message.length;
@@ -168,19 +169,20 @@ void* send_thread(void *_) {
 void* recv_thread(void *_) {
   Message message;
   while (running) {
-    debug("recv_thread running");
+    debug("recv_thread waiting for new message");
     if (!recv_message(message)) {
       running = false;
       break;
     }
 
+    bytes_recv += message.length;
     if (message.type == NET_REPLY) {
       int length = message.length - sizeof(u32) - sizeof(u8);
+      debug("Received net reply with length = %d", message.length);
       if (length != write(tunfd, message.data, length)) {
         debug("System tunnel down");
         break;
       }
-      bytes_recv += message.length;
     } else if (message.type == HEARTBEAT) {
       time_last_heartbeat = time_connected;
       debug("Heartbeat received (time: %d)", time_last_heartbeat);
