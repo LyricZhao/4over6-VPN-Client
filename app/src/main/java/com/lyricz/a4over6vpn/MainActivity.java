@@ -18,6 +18,7 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 
@@ -32,8 +33,8 @@ public class MainActivity extends AppCompatActivity {
     public static String UI_STATUS = "UI_STATUS";
     public static String UI_CREATE = "UI_CREATE";
     public static String UI_FAILED = "UI_FAILED";
-    public static String UI_END    = "UI_END";
-    public static String UI_ERROR  = "UI_ERROR";
+    public static String UI_END = "UI_END";
+    public static String UI_ERROR = "UI_ERROR";
 
     // Intent Extra
     public static String INTENT_ADDR = "addr";
@@ -43,9 +44,11 @@ public class MainActivity extends AppCompatActivity {
     static int VPN_INTENT_REQUEST = 0;
     static String TAG = "MainActivity";
     boolean connected = false;
+    BroadcastReceiver receiver;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        Log.d(TAG, "Creating instance");
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
@@ -57,11 +60,11 @@ public class MainActivity extends AppCompatActivity {
 
         // UI broadcast receiver
         Context ui = this;
-        BroadcastReceiver receiver = new BroadcastReceiver() {
+        receiver = new BroadcastReceiver() {
             @Override
             public void onReceive(Context context, Intent intent) {
                 String status = intent.getStringExtra(UI_STATUS);
-                assert(status != null);
+                assert (status != null);
                 if (status.equals(UI_CREATE)) {
                     connectButton.setClickable(true);
                     connectButton.setText(R.string.disconnect_text);
@@ -79,7 +82,7 @@ public class MainActivity extends AppCompatActivity {
                     connectButton.setClickable(true);
                     connectButton.setText(R.string.connect_text);
                     connected = false;
-                } else if(status.equals(UI_ERROR)) {
+                } else if (status.equals(UI_ERROR)) {
                     // Error end
                     Toast.makeText(ui, "Connection is down", Toast.LENGTH_SHORT).show();
                     stopVPNService();
@@ -109,6 +112,7 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    // Click button
     public void click(View view) {
         if (connected) {
             stopVPNService();
@@ -147,9 +151,11 @@ public class MainActivity extends AppCompatActivity {
         sendBroadcast(stop);
     }
 
+    // End process
     @Override
     protected void onDestroy() {
         stopVPNService();
+        unregisterReceiver(receiver);
         super.onDestroy();
     }
 }

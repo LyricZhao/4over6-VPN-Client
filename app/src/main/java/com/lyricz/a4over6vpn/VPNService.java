@@ -38,6 +38,7 @@ public class VPNService extends VpnService {
     TimerTask task = null;
     BroadcastReceiver receiver;
     ParcelFileDescriptor fdInterface;
+    String IPv4Address, serverIPv6Address;
 
     @SuppressLint("Assert")
     @Override
@@ -80,6 +81,7 @@ public class VPNService extends VpnService {
         String addr = intent.getStringExtra(MainActivity.INTENT_ADDR);
         String port = intent.getStringExtra(MainActivity.INTENT_PORT);
         Log.d(TAG, "Start VPN Service with " + addr + "@" + port);
+        serverIPv6Address = addr;
 
         sockfd = open(addr, port);
         String info = request();
@@ -104,6 +106,8 @@ public class VPNService extends VpnService {
                     .setMtu(MTU)                                // mtu
                     .establish();
 
+            IPv4Address = settings[0];
+
             assert fdInterface != null;
             int tunfd = fdInterface.getFd();
 
@@ -113,9 +117,11 @@ public class VPNService extends VpnService {
             startTimer();
 
             notifyUI(MainActivity.UI_CREATE);
-            return START_STICKY;
+            return START_NOT_STICKY;
         }
-        return START_STICKY;
+
+        // Do not start it again when system out of memory
+        return START_NOT_STICKY;
     }
 
     protected void notifyUI(String info) {
@@ -134,8 +140,11 @@ public class VPNService extends VpnService {
                 if (sockfd != -1) {
                     String info = tik();
                     if (!info.isEmpty()) {
+                        info += "IP address: " + IPv4Address + "\n";
+                        info += "Server address: " + serverIPv6Address;
                         notifyUI(info);
                     } else {
+                        Log.d(TAG, "Tik-tok failed");
                         sockfd = -1;
                     }
                 }

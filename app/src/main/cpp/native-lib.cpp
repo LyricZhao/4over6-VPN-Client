@@ -35,11 +35,9 @@ typedef unsigned int u32;
 // Parameters
 # define DATA_MAX_LENGTH              4096
 # define PRINT_BUFFER_LENGTH          128
-# define REQUEST_TIMEOUT_USEC         2000000
-# define REQUEST_CHECK_INTERVAL_USEC  5000
+# define REQUEST_LIMIT                3
 # define RECV_CHECK_INTEVAL           100
-# define RECONNECT_LIMIT              3
-# define SOCKET_TIMEOUT               2
+# define SOCKET_TIMEOUT               4     // also IP request timeout
 
 # define IP_REQUEST   100
 # define IP_REPLY     101
@@ -65,7 +63,7 @@ addrinfo *list;
 
 // Counters
 u32 time_connected, time_last_heartbeat, time_send_heartbeat;
-u32 bytes_sent, bytes_recv;
+u32 bytes_sent, bytes_recv, bytes_sent_sec, bytes_recv_sec;
 volatile bool running = false, ip_requesting = false;
 bool error_occured;
 
@@ -77,7 +75,7 @@ std::string pretty(u32 value, u32 scale, const char* *units, int m) {
     count += 1;
   }
   char buffer[PRINT_BUFFER_LENGTH];
-  sprintf(buffer, "%d %s\n", value, units[count]);
+  sprintf(buffer, "%d %s", value, units[count]);
   return std::string(buffer);
 }
 
@@ -109,10 +107,14 @@ int send_raw(u8* ptr, u32 length) {
 // Receive raw
 int recv_raw(u8 *buffer, u32 length) {
   int received = 0;
-  // Note: there will be no auto shutdown because the protocol does not include an end signal
+  // Note: there will be no auto shutdown because the protocol does not include an end signal, so the only way to stop is via heartbeat
   while ((running || ip_requesting) && (received < length)) {
     int single = recv(sockfd, buffer + received, length - received, 0);
     if (single <= 0) {
+      if (ip_requesting) {
+        debug("IP Request timeout");
+        break;
+      }
       usleep(RECV_CHECK_INTEVAL);
       continue;
     } else {
@@ -155,10 +157,11 @@ void* send_thread(void *_) {
       message.length = length + sizeof(u32) + sizeof(u8);
       message.type = NET_REQUEST;
 
-      debug("Sending from send_thread with length = %d", length);
+      // debug("Sending from send_thread with length = %d", length);
       send_raw((u8*) &message, message.length);
 
       bytes_sent += message.length;
+      bytes_sent_sec += message.length;
     }
   }
   debug("Sender thread ends");
@@ -169,16 +172,17 @@ void* send_thread(void *_) {
 void* recv_thread(void *_) {
   Message message;
   while (running) {
-    debug("recv_thread waiting for new message");
+    // debug("recv_thread waiting for new message");
     if (!recv_message(message)) {
       running = false;
       break;
     }
 
     bytes_recv += message.length;
+    bytes_recv_sec += message.length;
     if (message.type == NET_REPLY) {
       int length = message.length - sizeof(u32) - sizeof(u8);
-      debug("Received net reply with length = %d", message.length);
+      // debug("Received net reply with length = %d", message.length);
       if (length != write(tunfd, message.data, length)) {
         debug("System tunnel down");
         break;
@@ -224,7 +228,12 @@ extern "C" JNIEXPORT jstring JNICALL Java_com_lyricz_a4over6vpn_VPNService_tik(J
   }
 
   char str[PRINT_BUFFER_LENGTH];
-  sprintf(str, "Sent: %s\nReceived: %s\nTime connected: %s", prettySize(bytes_sent).c_str(), prettySize(bytes_recv).c_str(), prettyTime(time_connected).c_str());
+  sprintf(str, "Sent: %s (%s/s)\nReceived: %s (%s/s)\nTime connected: %s\n",
+    prettySize(bytes_sent).c_str(), prettySize(bytes_sent_sec).c_str(),
+    prettySize(bytes_recv).c_str(), prettySize(bytes_recv_sec).c_str(),
+    prettyTime(time_connected).c_str());
+
+  bytes_sent_sec = bytes_recv_sec = 0;
   return env -> NewStringUTF(str);
 }
 
@@ -254,11 +263,10 @@ extern "C" JNIEXPORT jboolean JNICALL Java_com_lyricz_a4over6vpn_VPNService_back
 // Apply for a global socket (addr can be a hostname)
 extern "C" JNIEXPORT jint JNICALL Java_com_lyricz_a4over6vpn_VPNService_open(JNIEnv* env, jobject /* this */, jstring j_addr, jstring j_port) {
   // Cleanup
-  bytes_recv = 0;
-  bytes_sent = 0;
+  bytes_recv = bytes_sent = 0;
   time_connected = 0;
-  time_last_heartbeat = 0;
-  time_send_heartbeat = 0;
+  time_last_heartbeat = time_send_heartbeat = 0;
+  bytes_sent_sec = bytes_recv_sec = 0;
   assert(sockfd == -1);
 
   const char* addr = env -> GetStringUTFChars(j_addr, 0);
@@ -320,9 +328,11 @@ extern "C" JNIEXPORT jstring JNICALL Java_com_lyricz_a4over6vpn_VPNService_reque
   send_ip_request();
 
   // Waiting for reply
-  u32 elapsed = 0;
+
+  u32 times_try = 0;
   Message message;
-  while (elapsed < REQUEST_TIMEOUT_USEC) {
+  while (times_try < REQUEST_LIMIT) {
+    debug("Waiting for IP reply");
     if (!recv_message(message)) {
       break;
     }
@@ -333,8 +343,8 @@ extern "C" JNIEXPORT jstring JNICALL Java_com_lyricz_a4over6vpn_VPNService_reque
       return env -> NewStringUTF((const char *) message.data);
     }
 
-    usleep(REQUEST_CHECK_INTERVAL_USEC);
-    elapsed += REQUEST_CHECK_INTERVAL_USEC;
+    debug("Not an IP reply");
+    ++ times_try;
   }
   ip_requesting = false;
 
