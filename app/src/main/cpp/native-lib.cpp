@@ -260,8 +260,6 @@ extern "C" JNIEXPORT jstring JNICALL Java_com_lyricz_a4over6vpn_VPNService_tik(J
 // Handler system network in/out flow
 extern "C" JNIEXPORT jboolean JNICALL Java_com_lyricz_a4over6vpn_VPNService_backend(JNIEnv* env, jobject /* this */, jint fd) {
   tunfd = fd;
-  running = true;
-  error_occured = false;
 
   // Send & receive thread
   pthread_t receiver, sender;
@@ -280,13 +278,20 @@ extern "C" JNIEXPORT jboolean JNICALL Java_com_lyricz_a4over6vpn_VPNService_back
   return (jboolean) error_occured;
 }
 
-// Apply for a global socket (addr can be a hostname)
-extern "C" JNIEXPORT jint JNICALL Java_com_lyricz_a4over6vpn_VPNService_open(JNIEnv* env, jobject /* this */, jstring j_addr, jstring j_port) {
+extern "C" JNIEXPORT void JNICALL Java_com_lyricz_a4over6vpn_VPNService_initialize(JNIEnv* env, jobject /* this */) {
+  // Setting running state
+  running = true;
+  error_occured = false;
+
   // Cleanup
   bytes_recv = bytes_sent = 0;
   time_connected = 0;
   time_last_heartbeat = time_send_heartbeat = 0;
   bytes_sent_sec = bytes_recv_sec = 0;
+}
+
+// Apply for a global socket (addr can be a hostname)
+extern "C" JNIEXPORT jint JNICALL Java_com_lyricz_a4over6vpn_VPNService_open(JNIEnv* env, jobject /* this */, jstring j_addr, jstring j_port) {
   assert(sockfd == -1);
 
   const char* addr = env -> GetStringUTFChars(j_addr, 0);
@@ -360,6 +365,7 @@ extern "C" JNIEXPORT jstring JNICALL Java_com_lyricz_a4over6vpn_VPNService_reque
     if (message.type == IP_REPLY) {
       ip_requesting = false;
       debug("Received IP reply: %s", message.data);
+
       return env -> NewStringUTF((const char *) message.data);
     }
 

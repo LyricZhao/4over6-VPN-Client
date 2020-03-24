@@ -111,6 +111,7 @@ public class VPNService extends VpnService {
             assert fdInterface != null;
             int tunfd = fdInterface.getFd();
 
+            initialize();
             backend = new BackendThread(tunfd);
             backend.start();
 
@@ -166,6 +167,9 @@ public class VPNService extends VpnService {
      */
     // Open a new socket
     public native int open(String addr, String port);
+
+    // Clean up before running
+    public native void initialize();
 
     // Request for a VPN address
     public native String request();
