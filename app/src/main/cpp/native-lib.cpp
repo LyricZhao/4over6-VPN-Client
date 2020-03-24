@@ -37,6 +37,7 @@ typedef unsigned int u32;
 # define PRINT_BUFFER_LENGTH          128
 # define REQUEST_LIMIT                3
 # define RECV_CHECK_INTEVAL           100
+# define RECONNECT_LIMIT              3
 # define SOCKET_TIMEOUT               4     // also IP request timeout
 
 # define IP_REQUEST   100
@@ -106,14 +107,26 @@ int send_raw(u8* ptr, u32 length) {
 
 // Receive raw
 int recv_raw(u8 *buffer, u32 length) {
-  int received = 0;
-  // Note: there will be no auto shutdown because the protocol does not include an end signal, so the only way to stop is via heartbeat
+  int received = 0, times_reconnect = 0;
+  // Note: there will be no auto shutdown because the protocol does not include an end signal, so the only way to stop is via heartbeat or reconnect times
   while ((running || ip_requesting) && (received < length)) {
     int single = recv(sockfd, buffer + received, length - received, 0);
-    if (single <= 0) {
-      if (single < 0) {
-        debug("recv_raw warning");
+    if (single < 0 && errno != EAGAIN) {
+      usleep(RECV_CHECK_INTEVAL);
+      debug("Reconnecting (%s)", strerror(errno));
+      if (connect(sockfd, sock_addr, sock_len) != 0) {
+        times_reconnect += 1;
+        debug("Reconnect error: %s", strerror(errno));
+        if (times_reconnect == RECONNECT_LIMIT) {
+          debug("Reaching reconnecting limit, shutdown");
+          break;
+        }
+      } else {
+        times_reconnect = 0;
+        debug("Reconnect OK");
       }
+    } else if (single <= 0) {
+      times_reconnect = 0;
       if (ip_requesting) {
         debug("IP Request timeout");
         break;
@@ -122,6 +135,7 @@ int recv_raw(u8 *buffer, u32 length) {
       continue;
     } else {
       // Read
+      times_reconnect = 0;
       received += single;
     }
   }
@@ -142,7 +156,7 @@ int send_ip_request() {
 bool recv_message(Message &message) {
   int size;
   size = recv_raw((u8 *) &message, sizeof(u32));
-  if (size < sizeof(u32) || (!running && !ip_requesting)) {
+  if ((size < sizeof(u32)) || (!running && !ip_requesting)) {
     return false;
   }
 
@@ -209,7 +223,6 @@ void cleanup() {
 // APIs
 // Tik-tok
 extern "C" JNIEXPORT jstring JNICALL Java_com_lyricz_a4over6vpn_VPNService_tik(JNIEnv* env, jobject /* this */) {
-  debug("Tik-tok");
   if (sockfd == -1 || !running) { // 'running' for UI delay
     return env -> NewStringUTF("");
   }
@@ -231,6 +244,11 @@ extern "C" JNIEXPORT jstring JNICALL Java_com_lyricz_a4over6vpn_VPNService_tik(J
 
   char str[PRINT_BUFFER_LENGTH];
   sprintf(str, "Sent: %s (%s/s)\nReceived: %s (%s/s)\nTime connected: %s\n",
+    prettySize(bytes_sent).c_str(), prettySize(bytes_sent_sec).c_str(),
+    prettySize(bytes_recv).c_str(), prettySize(bytes_recv_sec).c_str(),
+    prettyTime(time_connected).c_str());
+
+  debug("Sent: %s (%s/s) Received: %s (%s/s) Time connected: %s",
     prettySize(bytes_sent).c_str(), prettySize(bytes_sent_sec).c_str(),
     prettySize(bytes_recv).c_str(), prettySize(bytes_recv_sec).c_str(),
     prettyTime(time_connected).c_str());
@@ -288,7 +306,7 @@ extern "C" JNIEXPORT jint JNICALL Java_com_lyricz_a4over6vpn_VPNService_open(JNI
     debug("Creating socket at family@%d, type@%d, protocol@%d", ptr -> ai_family, ptr -> ai_socktype, ptr -> ai_protocol);
     sockfd = socket(ptr -> ai_family, ptr -> ai_socktype, ptr -> ai_protocol);
     if (sockfd < 0) {
-      debug("socket() failed");
+      debug("socket() failed, %s", strerror(errno));
       continue;
     }
 
