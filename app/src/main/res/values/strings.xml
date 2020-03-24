@@ -1,8 +1,8 @@
 <resources>
     <string name="app_name">4over6 VPN</string>
     <string name="default_statistics">Click CONNECT to begin</string>
-    <string name="default_addr">2402:f000:4:72:808::9a47</string>
-    <string name="default_port">5678</string>
+    <string name="default_addr">2408:400a:113:6500:ccae:39d3:edee:6997</string>
+    <string name="default_port">4321</string>
     <string name="connect_text">CONNECT</string>
     <string name="disconnect_text">DISCONNECT</string>
     <string name="address_text">Address</string>

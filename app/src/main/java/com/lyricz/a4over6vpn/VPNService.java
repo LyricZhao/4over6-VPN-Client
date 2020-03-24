@@ -96,6 +96,7 @@ public class VPNService extends VpnService {
             assert (settings.length == 5);
 
             // Configure
+            // Potential bug: if server returns a bad address, builder will crash
             Builder builder = new Builder();
             fdInterface = builder.setSession("4over6 VPN Session")
                     .addAddress(settings[0], 24)    // ip
