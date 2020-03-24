@@ -111,6 +111,9 @@ int recv_raw(u8 *buffer, u32 length) {
   while ((running || ip_requesting) && (received < length)) {
     int single = recv(sockfd, buffer + received, length - received, 0);
     if (single <= 0) {
+      if (single < 0) {
+        debug("recv_raw warning");
+      }
       if (ip_requesting) {
         debug("IP Request timeout");
         break;
@@ -151,7 +154,6 @@ bool recv_message(Message &message) {
 void* send_thread(void *_) {
   Message message;
   while (running) { // 'running' is volatile
-    memset(&message, 0, sizeof(Message));
     int length = read(tunfd, message.data, DATA_MAX_LENGTH);
     if (length > 0) {
       message.length = length + sizeof(u32) + sizeof(u8);
