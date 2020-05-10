@@ -364,6 +364,7 @@ extern "C" JNIEXPORT jstring JNICALL Java_com_lyricz_a4over6vpn_VPNService_reque
 
     if (message.type == IP_REPLY) {
       ip_requesting = false;
+      message.data[message.length - 5] = '\0';
       debug("Received IP reply: %s", message.data);
 
       return env -> NewStringUTF((const char *) message.data);
